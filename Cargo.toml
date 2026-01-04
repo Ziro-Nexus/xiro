@@ -1,0 +1,10 @@
+[package]
+name = "xiro"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+evalexpr = "13.0.0"
+proc-macro2 = "1"
+syn = { version = "2", features = ["parsing", "full"] }
+quote = "1"
