@@ -7,6 +7,7 @@ use syn::Expr;
 use syn::spanned::Spanned;
 
 use crate::data_types::primitive_types::DataTypes;
+use crate::utils::extraction_utils::extract_inner_tuples;
 
 use super::super::memory_table::vartable::Variable;
 use super::super::memory_table::vartable::VariableTableInMemory;
@@ -23,82 +24,44 @@ impl ReportHandler {
         }
     }
 
+    fn convert_to_xiro(val: evalexpr::Value) -> DataTypes {
+        match val {
+            evalexpr::Value::Int(i) => DataTypes::NUMBER(i),
+            evalexpr::Value::Float(f) => DataTypes::FLOAT(f),
+            evalexpr::Value::Boolean(b) => DataTypes::BOOL(b),
+            evalexpr::Value::String(s) => DataTypes::STR(s),
+            evalexpr::Value::Tuple(v) => {
+                // ¡Aquí ocurre la magia! Mapeamos cada elemento
+                // llamando a esta misma función.
+                let inner_list = v.into_iter().map(Self::convert_to_xiro).collect();
+                DataTypes::LIST(inner_list)
+            }
+            _ => DataTypes::STR(val.to_string()),
+        }
+    }
+
     fn handle_variable_declaration(rp: &GeneratorReport, vmt: &mut VariableTableInMemory) {
         let rc = rp.tokens.as_ref().unwrap();
-        let name = rc.clone().into_iter().nth(1).unwrap().to_string();
-        let type_value = rc.clone().into_iter().nth(3).unwrap().to_string();
-        let arguments_value = type_value.clone();
+        let name = rc.clone().into_iter().nth(1).expect("No name").to_string();
+        let raw_value = rc.clone().into_iter().nth(3).expect("No value").to_string();
+
         println!(
             "Variable Declaration - Name: {}, Value: {}",
-            name, type_value
+            name, raw_value
         );
 
-        let datatype: DataTypes;
-        // resolve possible expr
-        let type_value = eval(&type_value);
+        // Evaluamos la expresión una sola vez
+        match eval(&raw_value) {
+            Ok(eval_value) => {
+                // Usamos nuestra función recursiva
+                let datatype = Self::convert_to_xiro(eval_value);
 
-        match type_value {
-            Ok(matched_type_value) => match matched_type_value {
-                evalexpr::Value::Int(i) => {
-                    datatype = DataTypes::NUMBER(i);
-                }
-                evalexpr::Value::Float(f) => {
-                    datatype = DataTypes::FLOAT(f);
-                }
-                evalexpr::Value::Boolean(b) => {
-                    datatype = DataTypes::BOOL(b);
-                }
-                evalexpr::Value::String(s) => {
-                    datatype = DataTypes::STR(s);
-                }
-                evalexpr::Value::Tuple(_) => {
-                    let arguments_value = arguments_value.replace("(", "").replace(")", "");
-                    let items: Vec<&str> = arguments_value.split(',').collect();
-                    let mut data_list: Vec<DataTypes> = Vec::new();
-                    for item in items {
-                        let trimmed_item = item.trim();
-                        let eval_item = eval(trimmed_item);
-                        match eval_item {
-                            Ok(ev) => match ev {
-                                evalexpr::Value::Int(i) => {
-                                    data_list.push(DataTypes::NUMBER(i));
-                                }
-                                evalexpr::Value::Float(f) => {
-                                    data_list.push(DataTypes::FLOAT(f));
-                                }
-                                evalexpr::Value::Boolean(b) => {
-                                    data_list.push(DataTypes::BOOL(b));
-                                }
-                                evalexpr::Value::String(s) => {
-                                    data_list.push(DataTypes::STR(s));
-                                }
-                                _ => {
-                                    data_list.push(DataTypes::STR(ev.to_string()));
-                                }
-                            },
-                            Err(_) => {
-                                data_list.push(DataTypes::STR(trimmed_item.to_string()));
-                            }
-                        }
-                    }
-                    datatype = DataTypes::LIST(data_list);
-                }
-                _ => {
-                    panic!("Syntax Error");
-                }
-            },
-            Err(_) => {
-                panic!("Error evaluating expression for variable declaration");
+                // Aquí lo guardas en tu tabla (vmt.add o similar)
+                // vmt.variable_list.push(Variable { name, value: datatype, ... });
+                println!("Variable añadida con éxito: {:#?}", datatype);
             }
+            Err(e) => panic!("Error evaluando '{}': {}", raw_value, e),
         }
-
-        let mut new_var = Variable::new(name, datatype);
-        new_var.resolve_value_type();
-        vmt.push_var(new_var);
-        println!(
-            "Variable added to Variable Table in Memory. {}",
-            format!("{:#?}", vmt)
-        );
     }
 
     pub fn print_status_report(rp: &GeneratorReport) {
