@@ -1,24 +1,48 @@
 // src/main.rs
-// Xiro scripting interpreted language
+// Xiro DSL
 
-mod utils;
-mod report;
 mod data_types;
 mod memory_table;
 mod plugins;
+mod report;
+mod utils;
 
+use memory_table::vartable::VariableTableInMemory;
 use report::generator::generate_syntax_report;
 use report::syntax_report_handler::ReportHandler;
-use memory_table::vartable::VariableTableInMemory;
+
+use crate::utils::telemetry::init_xiro_telemetry;
 
 fn main() {
-
-    let var0 = generate_syntax_report("def a = (2 + 2, 2, 2, (3, 3 + 2))");
-    let var1 = generate_syntax_report("def a = 56");
+    init_xiro_telemetry();
     let mut vtm = VariableTableInMemory::new();
-    ReportHandler::handle_report(&var0, &mut vtm);
-    ReportHandler::handle_report(&var1, &mut vtm);
-    ReportHandler::print_status_report(&var0);
-    ReportHandler::print_status_report(&var1);
 
+    let mut buffer = String::new();
+
+    loop {
+        print!("XS>> ");
+        std::io::Write::flush(&mut std::io::stdout()).expect("Flush failed!");
+        std::io::stdin()
+            .read_line(&mut buffer)
+            .expect("Failed to read line");
+
+        let syntax_report = generate_syntax_report(&buffer.trim());
+        ReportHandler::handle_report(&syntax_report, &mut vtm);
+        ReportHandler::print_status_report(&syntax_report);
+
+        println!("Output:");
+
+        for r in vtm.get_table().iter() {
+            match r.get_value() {
+                data_types::primitive_types::DataTypes::NUMBER(n) => println!("{:?}", n),
+                data_types::primitive_types::DataTypes::BOOL(b) => println!("{:?}", b),
+                data_types::primitive_types::DataTypes::FLOAT(f) => println!("{:?}", f),
+                data_types::primitive_types::DataTypes::STR(s) => println!("{:?}", s),
+                data_types::primitive_types::DataTypes::LIST(l) => println!("{:?}", l),
+            }
+        }
+
+        print!("\n");
+        buffer.clear();
+    }
 }

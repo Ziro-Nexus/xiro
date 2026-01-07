@@ -8,3 +8,6 @@ evalexpr = "13.0.0"
 proc-macro2 = "1"
 syn = { version = "2", features = ["parsing", "full"] }
 quote = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+colored = "2.0"

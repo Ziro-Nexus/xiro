@@ -1,17 +1,13 @@
 // src/report/syntax_report_handler.rs
 
-use core::panic;
-
+use std::process::exit;
 use evalexpr::eval;
-use syn::Expr;
-use syn::spanned::Spanned;
+use colored::*;
+use tracing::{info, error, warn};
 
-use crate::data_types::primitive_types::DataTypes;
-use crate::utils::extraction_utils::extract_inner_tuples;
-
-use super::super::memory_table::vartable::Variable;
-use super::super::memory_table::vartable::VariableTableInMemory;
-use super::super::plugins::primitive_plugins::PRIMITIVEPLUGINS;
+use crate::data_types::primitive_types;
+use crate::utils::conversion_utils::convert_to_xiro_dt;
+use super::super::memory_table::vartable::{Variable, VariableTableInMemory};
 use super::generator::GeneratorReport;
 
 pub struct ReportHandler;
@@ -19,59 +15,84 @@ pub struct ReportHandler;
 impl ReportHandler {
     pub fn handle_report(rp: &GeneratorReport, vtm: &mut VariableTableInMemory) {
         if rp.is_variable_declaration {
-            println!("Handling variable declaration report...");
             Self::handle_variable_declaration(rp, vtm);
+        } else if rp.is_set_variable {
+            Self::handle_set_variable(rp, vtm);
         }
     }
 
-    fn convert_to_xiro(val: evalexpr::Value) -> DataTypes {
-        match val {
-            evalexpr::Value::Int(i) => DataTypes::NUMBER(i),
-            evalexpr::Value::Float(f) => DataTypes::FLOAT(f),
-            evalexpr::Value::Boolean(b) => DataTypes::BOOL(b),
-            evalexpr::Value::String(s) => DataTypes::STR(s),
-            evalexpr::Value::Tuple(v) => {
-                // ¡Aquí ocurre la magia! Mapeamos cada elemento
-                // llamando a esta misma función.
-                let inner_list = v.into_iter().map(Self::convert_to_xiro).collect();
-                DataTypes::LIST(inner_list)
-            }
-            _ => DataTypes::STR(val.to_string()),
-        }
-    }
-
-    fn handle_variable_declaration(rp: &GeneratorReport, vmt: &mut VariableTableInMemory) {
+    fn handle_variable_declaration(rp: &GeneratorReport, vtm: &mut VariableTableInMemory) {
         let rc = rp.tokens.as_ref().unwrap();
-        let name = rc.clone().into_iter().nth(1).expect("No name").to_string();
-        let raw_value = rc.clone().into_iter().nth(3).expect("No value").to_string();
+        let name = rc.clone().into_iter().nth(0).expect("ERR: No name").to_string();
+        let raw_value = rc.clone().into_iter().nth(3).expect("ERR: No value").to_string();
 
-        println!(
-            "Variable Declaration - Name: {}, Value: {}",
-            name, raw_value
-        );
+        println!("Resolving variable declaration: {} = {}", name, raw_value);
 
-        // Evaluamos la expresión una sola vez
-        match eval(&raw_value) {
+        let resolved_value = vtm.resolve_existing_identificators(raw_value.clone());
+
+        match eval(&resolved_value) {
             Ok(eval_value) => {
-                // Usamos nuestra función recursiva
-                let datatype = Self::convert_to_xiro(eval_value);
-
-                // Aquí lo guardas en tu tabla (vmt.add o similar)
-                // vmt.variable_list.push(Variable { name, value: datatype, ... });
-                println!("Variable añadida con éxito: {:#?}", datatype);
+                let datatype = convert_to_xiro_dt(eval_value);
+                let mut new_var = Variable::new(name, datatype);
+                new_var.resolve_value_type();
+                vtm.push_var(new_var);
             }
-            Err(e) => panic!("Error evaluando '{}': {}", raw_value, e),
+            Err(e) => {
+                error!("🛑 Evaluation Fault: Cannot declare variable '{}'", name);
+                error!("📟 Source: {}", raw_value.bright_black());
+                error!("⚠️  Reason: {}", e);
+                exit(1);
+            }
+        }
+    }
+
+    fn handle_set_variable(rp: &GeneratorReport, vtm: &mut VariableTableInMemory) {
+        let rc = rp.tokens.as_ref().unwrap();
+        let name = rc.clone().into_iter().nth(0).expect("ERR: No name").to_string();
+        let raw_value = rc.clone().into_iter().nth(2).expect("ERR: No value").to_string();
+
+        let resolved_value = vtm.resolve_existing_identificators(raw_value.clone());
+
+        match eval(&resolved_value) {
+            Ok(eval_value) => {
+                let datatype = convert_to_xiro_dt(eval_value);
+                let mut new_var = Variable::new(name, datatype);
+                new_var.resolve_value_type();
+                vtm.set_var(new_var);
+            }
+            Err(e) => {
+                error!("💀 Memory Write Collision: Failed to set '{}'", name);
+                error!("📟 Expression: {}", raw_value);
+                //error!("⚠️ Reason: Tried to evaluate but got error: {}", e);
+                exit(1);
+            }
         }
     }
 
     pub fn print_status_report(rp: &GeneratorReport) {
-        println!("--- Syntax Report ---");
-        println!("Is Variable Declaration: {}", rp.is_variable_declaration);
-        println!("Is Expression: {}", rp.is_expression);
-        match &rp.tokens {
-            Some(tokens) => println!("Tokens: {}", tokens.to_string()),
-            None => println!("Tokens: None"),
+        let header = " XIRO SYNTAX REPORT ".bold().on_bright_black().white();
+        let border = "═".repeat(40).bright_black();
+        
+        println!("\n{}", border);
+        println!("{}", header);
+        
+        let status = if rp.is_variable_declaration { "DECLARATION" } 
+                    else if rp.is_set_variable { "ASSIGNMENT" } 
+                    else if rp.is_expression { "EXPRESSION" } 
+                    else { "UNKNOWN" };
+
+        println!(" 🧩 Type:      {}", status.cyan().bold());
+        
+        if let Some(tokens) = &rp.tokens {
+            println!(" 📜 Buffer:    {}", tokens.to_string().italic().bright_white());
         }
-        println!("---------------------");
+
+        let mut flags = Vec::new();
+        if rp.is_variable_declaration { flags.push("INIT"); }
+        if rp.is_set_variable { flags.push("MUTATE"); }
+        if rp.is_expression { flags.push("EVAL"); }
+        
+        println!(" ⚙️  Flags:     {}", flags.join(" | ").yellow());
+        println!("{}\n", border);
     }
 }

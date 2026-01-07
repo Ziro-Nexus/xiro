@@ -9,6 +9,33 @@ pub enum DataTypes {
     LIST(Vec<DataTypes>),
 }
 
+impl Clone for DataTypes {
+    fn clone(&self) -> Self {
+        match self {
+            DataTypes::STR(s) => DataTypes::STR(s.clone()),
+            DataTypes::NUMBER(n) => DataTypes::NUMBER(*n),
+            DataTypes::FLOAT(f) => DataTypes::FLOAT(*f),
+            DataTypes::BOOL(b) => DataTypes::BOOL(*b),
+            DataTypes::LIST(l) => DataTypes::LIST(l.clone()),
+        }
+    }
+}
+
+impl ToString for DataTypes {
+    fn to_string(&self) -> String {
+        match self {
+            DataTypes::STR(s) => s.clone(),
+            DataTypes::NUMBER(n) => n.to_string(),
+            DataTypes::FLOAT(f) => f.to_string(),
+            DataTypes::BOOL(b) => b.to_string(),
+            DataTypes::LIST(l) => {
+                let elements: Vec<String> = l.iter().map(|dt| dt.to_string()).collect();
+                format!("({})", elements.join(","))
+            }
+        }
+    }
+}
+
 pub enum DataTypesIds {
     ISSTR,
     ISNUMBER,
