@@ -22,27 +22,33 @@ fn main() {
     loop {
         print!("XS>> ");
         std::io::Write::flush(&mut std::io::stdout()).expect("Flush failed!");
+        
         std::io::stdin()
             .read_line(&mut buffer)
             .expect("Failed to read line");
 
-        let syntax_report = generate_syntax_report(&buffer.trim());
-        ReportHandler::handle_report(&syntax_report, &mut vtm);
-        ReportHandler::print_status_report(&syntax_report);
-
-        println!("Output:");
-
-        for r in vtm.get_table().iter() {
-            match r.get_value() {
-                data_types::primitive_types::DataTypes::NUMBER(n) => println!("{:?}", n),
-                data_types::primitive_types::DataTypes::BOOL(b) => println!("{:?}", b),
-                data_types::primitive_types::DataTypes::FLOAT(f) => println!("{:?}", f),
-                data_types::primitive_types::DataTypes::STR(s) => println!("{:?}", s),
-                data_types::primitive_types::DataTypes::LIST(l) => println!("{:?}", l),
-            }
+        if buffer.trim().is_empty() {
+            continue;
         }
 
-        print!("\n");
+        if buffer.trim() == "print_vars()" {
+            for r in vtm.get_table().iter() {
+                match r.get_value() {
+                    data_types::primitive_types::DataTypes::NUMBER(n) => println!("{} = {:?}", r.name, n),
+                    data_types::primitive_types::DataTypes::BOOL(b) => println!("{} = {:?}", r.name, b),
+                    data_types::primitive_types::DataTypes::FLOAT(f) => println!("{} = {:?}", r.name, f),
+                    data_types::primitive_types::DataTypes::STR(s) => println!("{} = {:?}", r.name, s),
+                    data_types::primitive_types::DataTypes::LIST(l) => println!("{} = {:?}", r.name, l),
+                }
+            }
+            continue;
+        }
+
+        let syntax_report = generate_syntax_report(&buffer.trim());
+        ReportHandler::handle_report(&syntax_report, &mut vtm);
+        //ReportHandler::print_status_report(&syntax_report);
+
+        
         buffer.clear();
     }
 }

@@ -36,6 +36,8 @@ pub fn generate_syntax_report(code: &str) -> GeneratorReport {
     }
 
     error!("⚠️  Unrecognized syntax: '{}'", code);
-    exit(1);
+    //exit(1);
+
+    report
     
 }

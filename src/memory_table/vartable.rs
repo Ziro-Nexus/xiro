@@ -12,7 +12,7 @@ use super::super::data_types::primitive_types::retrieve_list;
 
 #[derive(Debug)]
 pub struct Variable {
-    name: String,
+    pub name: String,
     value: primitive_types::DataTypes,
     var_type_number: i32
 }
@@ -29,6 +29,10 @@ impl Variable {
 
     pub fn get_value(&self) -> &primitive_types::DataTypes {
         &self.value
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 
     pub fn resolve_value_type(&mut self) {

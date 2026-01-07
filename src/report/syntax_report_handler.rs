@@ -26,8 +26,6 @@ impl ReportHandler {
         let name = rc.clone().into_iter().nth(0).expect("ERR: No name").to_string();
         let raw_value = rc.clone().into_iter().nth(3).expect("ERR: No value").to_string();
 
-        println!("Resolving variable declaration: {} = {}", name, raw_value);
-
         let resolved_value = vtm.resolve_existing_identificators(raw_value.clone());
 
         match eval(&resolved_value) {
@@ -41,7 +39,7 @@ impl ReportHandler {
                 error!("🛑 Evaluation Fault: Cannot declare variable '{}'", name);
                 error!("📟 Source: {}", raw_value.bright_black());
                 error!("⚠️  Reason: {}", e);
-                exit(1);
+                //exit(1);
             }
         }
     }
@@ -64,7 +62,7 @@ impl ReportHandler {
                 error!("💀 Memory Write Collision: Failed to set '{}'", name);
                 error!("📟 Expression: {}", raw_value);
                 //error!("⚠️ Reason: Tried to evaluate but got error: {}", e);
-                exit(1);
+                //exit(1);
             }
         }
     }
